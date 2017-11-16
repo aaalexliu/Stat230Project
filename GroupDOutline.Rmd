@@ -1,0 +1,22 @@
+---
+title: "GroupDOutline"
+author: "Alex Liu, Rana Barghout, Daniel Njoo"
+date: "November 16, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(cache = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+```
+
+```{r}
+swipe_data<-read.csv('./GroupDDataset.csv')
+```
+
