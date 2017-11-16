@@ -1,0 +1,23 @@
+---
+title: "val data"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+setwd("/Users/Alex/Dropbox (Amherst College)/Amherst/Intermediate Statistics 230/val_project/valscraper")
+```
+
+```{r}
+df <- read.csv("val_traditional.csv", header = TRUE, stringsAsFactors = FALSE)
+val <- mutate(df, traditional = NULL, date= as.Date(date, format = "%Y-%m-%d"), type = as.factor(type),
+              meal = factor(df$traditional))
+str(val)
+```
+
+```{r}
+freq_table <- count(val, meal)
+plot(freq_table)
+```
+
