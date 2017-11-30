@@ -3,8 +3,11 @@ title: "GroupDProgress1"
 author: "Alex Liu, Rana Barghout, Daniel Njoo"
 date: "November 29, 2017"
 output: 
-  pdf_document:
-  toc: true
+  html_document:
+    toc: true
+    number_sections: true
+    theme: united
+    toc_float: true
 ---
 
 #INTRO
@@ -17,7 +20,7 @@ knitr::opts_chunk$set(cache = TRUE)
 ```
 
 ### Libraries
-```{r libraries, message=F}
+```{r libraries, message=F, warning=F}
 library(tidyverse)
 library(ggplot2)
 library(xts)
@@ -84,7 +87,7 @@ bwplot(count ~ tag66, data = cleaned)
 bwplot(count ~ weekday, data = cleaned)
 ```
 
-Repeat the analysis for a sliced period of time using xts.
+Repeat the analysis for a sliced period of time using xts, this one September 1st 2016 to January 1st 2017.
 ```{r}
 fall_2016 <- data.frame(coredata(slicer['2016-09-01/2017-01-01']))
 fall_2016$count <- as.numeric(fall_2016$count)
