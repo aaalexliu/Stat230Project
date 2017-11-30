@@ -10,8 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(cache = TRUE)
 ```
 
-
-```{r}
+```{r message=F, include=F}
 library(tidyverse)
 library(ggplot2)
 library(xts)
@@ -20,23 +19,25 @@ library(lubridate)
 ```
 
 ```{r}
-setwd('/Users/Alex/Dropbox (Amherst College)/Amherst/Intermediate Statistics 230/val_project/')
 swipe_data<-read.csv('./GroupDDataset.csv')
 swipe_data$date <- as.Date(swipe_data[,'date'], format = '%m/%d/%y')
-
 processed_tags <- read.csv('./valscraper/val_t60_simplified.csv')
-
 processed_tags$date <- as.Date(processed_tags[,'date'], format = '%m/%d/%y')
-
 swipe_data2 <- left_join(swipe_data, processed_tags, by = c('date', 'type'))
 ```
 
 ```{r}
-#swipes <- swipe_data[,c('date', 'count', 'Events', 'type', 'tag_cluster_t75')]
 swipes <- swipe_data2[,c('date', 'count', 'Events', 'semester', 'type', 'tag_cluster_t75', 'tag_cluster_t69', 'tag_cluster_t66')]
-
 school_only <- filter(swipes, semester == 'Fall' || semester == 'Spring')
+```
 
+```{r}
+temp<-swipes %>% group_by(semester, year(date))
+```
+
+
+
+```{r}
 tagged <- swipes
 #only include data with tags
 tagged <- subset(tagged, tag_cluster_t75 != '')
