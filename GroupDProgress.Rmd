@@ -16,14 +16,16 @@ library(tidyverse)
 library(ggplot2)
 library(xts)
 library(mosaic)
+library(lubridate)
 ```
 
 ```{r}
 setwd('/Users/Alex/Dropbox (Amherst College)/Amherst/Intermediate Statistics 230/val_project/')
 swipe_data<-read.csv('./GroupDDataset.csv')
-swipe_data$date <- as.Date(swipe_data[,'date'], format = '%m/%d/%Y')
+swipe_data$date <- as.Date(swipe_data[,'date'], format = '%m/%d/%y')
 
 processed_tags <- read.csv('./valscraper/val_t60_simplified.csv')
+
 processed_tags$date <- as.Date(processed_tags[,'date'], format = '%m/%d/%y')
 
 swipe_data2 <- left_join(swipe_data, processed_tags, by = c('date', 'type'))
@@ -33,7 +35,7 @@ swipe_data2 <- left_join(swipe_data, processed_tags, by = c('date', 'type'))
 #swipes <- swipe_data[,c('date', 'count', 'Events', 'type', 'tag_cluster_t75')]
 swipes <- swipe_data2[,c('date', 'count', 'Events', 'semester', 'type', 'tag_cluster_t75', 'tag_cluster_t69', 'tag_cluster_t66')]
 
-school_only <- filter(swipes, )
+school_only <- filter(swipes, semester == 'Fall' || semester == 'Spring')
 
 tagged <- swipes
 #only include data with tags
