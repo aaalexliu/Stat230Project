@@ -53,7 +53,7 @@ After examining the tagged data, we find that summer data is still included, and
 ```{r}
 cleaned <- na.omit(tagged)
 levels(cleaned$Events)[levels(cleaned$Events) == ""] <- "No Event"
-colnames(cleaned) <- c('date', 'count', 'event', 'type', 'tag75', 'tag69', 'tag66')
+colnames(cleaned) <- c('date', 'count', 'event','semester', 'type', 'tag75', 'tag69', 'tag66')
 str(cleaned)
 ```
 
@@ -68,8 +68,17 @@ cleaned$weekday <- weekdays(cleaned$posix)
 ```
 
 ```{r}
+cleaned <- mutate(cleaned, year = year(date))
+cleaned <- cleaned %>% 
+  group_by(semester, year) %>%
+  mutate(semester_week = (week(date) - week(min(date)) + 1))
+```
+
+
+
+```{r}
 slicer <- xts(x = cleaned[,-10], order.by = cleaned$posix)
-ts <- xts(x = cleaned[,1], order.by = cleaned$posix)
+ts <- xts(x = cleaned[,2], order.by = cleaned$posix)
 ```
 
 ```{r}
@@ -80,7 +89,6 @@ fall_2016$count <- as.numeric(fall_2016$count)
 bwplot(count ~ tag66, data = fall_2016)
 bwplot(count ~ weekday, data = fall_2016)
 ```
-
 
 
 
@@ -99,7 +107,7 @@ joined <- left_join(breakfast,lunch, by = "date")
 joined <- left_join(joined, dinner, by = "date")
 bld <- joined[,c('date', 'count.x', 'count.y', 'count')]
 colnames(bld) <- c('date', 'breakfast', 'lunch', 'dinner')
-ts2 <- xts(bld[,2:4], order.by = bld[,1])
+ts2 <- xts(bld[,2:4], order.by = bld$date)
 ```
 
 ```{r}
@@ -108,42 +116,3 @@ plot(ts2, subset = '2016-09-01/', legend.loc = 'topleft')
 plot(ts2, subset = '2016-09-01/2017-01-01', legend.loc = 'topleft')
 plot(ts2, subset = '2016-09', legend.loc = 'topleft')
 ```
-
-# Introduction
-We plan to study historical headcounts for meals eaten at the Valentine Dining Hall (‘Val’) at Amherst College and to build a predictive model by fitting a model to the historical data. We hope that, if our model is accurate enough, it could be used to predict future headcount numbers. 
-
-We believe that this information is both relevant and important to the Amherst community because if we can predict headcounts more accurately, we can help prevent further food wastage by giving the Val kitchen staff better information to inform the quantities of food that they cook. Further, if the information is granular enough (i.e. 15 minute periods), we might also be able to offer insight to Amherst students and other members of the Amherst community of predicted peak hours.
-
-# Outline of Analysis
-PLOTS
-- histogram of counts
-
-```{r}
-subset(swipe_data, count!=0) %>% ggplot(aes(count)) + geom_bar(width=20)
-```
-
-
-- counts vs events
-
-```{r}
-
-table(swipe_data$Events)
-```
-
-
-- counts vs t75
-
-ANALYSIS
-- MLR of counts ~ t75+events
-
-count
-
-
-#Uniqueness of tags
-Surprisingly, the tags are all unique, given that there are 109 clusters in t75. We find that R has already factorized the tags into 109 levels, so they are each unique.
-```{r}
-str(swipe_data)
-```
-
-
-
