@@ -1,0 +1,149 @@
+---
+title: "GroupDFinal"
+author: "Alex Liu, Rana Barghout, Daniel Njoo"
+date: "November 16, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(cache = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(xts)
+library(mosaic)
+library(lubridate)
+```
+
+```{r}
+setwd('/Users/Alex/Dropbox (Amherst College)/Amherst/Intermediate Statistics 230/val_project/')
+swipe_data<-read.csv('./GroupDDataset.csv')
+swipe_data$date <- as.Date(swipe_data[,'date'], format = '%m/%d/%y')
+
+processed_tags <- read.csv('./valscraper/val_t60_simplified.csv')
+
+processed_tags$date <- as.Date(processed_tags[,'date'], format = '%m/%d/%y')
+
+swipe_data2 <- left_join(swipe_data, processed_tags, by = c('date', 'type'))
+```
+
+```{r}
+#swipes <- swipe_data[,c('date', 'count', 'Events', 'type', 'tag_cluster_t75')]
+swipes <- swipe_data2[,c('date', 'count', 'Events', 'semester', 'type', 'tag_cluster_t75', 'tag_cluster_t69', 'tag_cluster_t66')]
+
+school_only <- filter(swipes, semester == 'Fall' | semester == 'Spring')
+
+tagged <- school_only
+#only include data with tags
+tagged <- subset(tagged, tag_cluster_t75 != '')
+tagged$tag_cluster_t75 <- factor(tagged$tag_cluster_t75)
+
+tagged <- subset(tagged, tag_cluster_t69 != '')
+tagged$tag_cluster_t69 <- factor(tagged$tag_cluster_t69)
+
+tagged <- subset(tagged, tag_cluster_t66 != '')
+tagged$tag_cluster_t66 <- factor(tagged$tag_cluster_t66)
+```
+After examining the tagged data, we find that summer data is still included, and has NA values for count. Since our project goal is to look at Val during normal school year operations, we exclude summer data. We also do not have swipe data for the school year 2017-2018, and na.omit removes these as well
+
+```{r}
+cleaned <- na.omit(tagged)
+levels(cleaned$Events)[levels(cleaned$Events) == ""] <- "No Event"
+colnames(cleaned) <- c('date', 'count', 'event', 'type', 'tag75', 'tag69', 'tag66')
+str(cleaned)
+```
+
+
+```{r}
+cleaned$substitute_time[cleaned$type == "Breakfast"] = "8:00:00"
+cleaned$substitute_time[cleaned$type == "Lunch"] = "13:00:00"
+cleaned$substitute_time[cleaned$type == "Dinner"] = "18:00:00"
+cleaned$datetime <- paste(cleaned$date, cleaned$substitute_time)
+cleaned$posix <- as.POSIXct(cleaned$datetime, format = '%Y-%m-%d %H:%M:%S')
+cleaned$weekday <- weekdays(cleaned$posix)
+```
+
+```{r}
+slicer <- xts(x = cleaned[,-10], order.by = cleaned$posix)
+ts <- xts(x = cleaned[,1], order.by = cleaned$posix)
+```
+
+```{r}
+bwplot(count ~ tag66, data = cleaned)
+bwplot(count ~ weekday, data = cleaned)
+fall_2016 <- data.frame(coredata(slicer['2016-09-01/2017-01-01']))
+fall_2016$count <- as.numeric(fall_2016$count)
+bwplot(count ~ tag66, data = fall_2016)
+bwplot(count ~ weekday, data = fall_2016)
+```
+
+
+
+
+```{r}
+plot(ts[,1])
+plot(ts[,1], subset = '2016-09-01/')
+plot(ts[,1], subset = '2016-09-01/2017-01-01')
+plot(ts[,1], subset = '2016-09')
+```
+
+```{r}
+breakfast <- filter(cleaned, type == 'Breakfast')
+lunch <- filter(cleaned, type == 'Lunch')
+dinner <- filter(cleaned, type == 'Dinner')
+joined <- left_join(breakfast,lunch, by = "date")
+joined <- left_join(joined, dinner, by = "date")
+bld <- joined[,c('date', 'count.x', 'count.y', 'count')]
+colnames(bld) <- c('date', 'breakfast', 'lunch', 'dinner')
+ts2 <- xts(bld[,2:4], order.by = bld[,1])
+```
+
+```{r}
+plot(ts2, legend.loc = 'topleft')
+plot(ts2, subset = '2016-09-01/', legend.loc = 'topleft')
+plot(ts2, subset = '2016-09-01/2017-01-01', legend.loc = 'topleft')
+plot(ts2, subset = '2016-09', legend.loc = 'topleft')
+```
+
+# Introduction
+We plan to study historical headcounts for meals eaten at the Valentine Dining Hall (‘Val’) at Amherst College and to build a predictive model by fitting a model to the historical data. We hope that, if our model is accurate enough, it could be used to predict future headcount numbers. 
+
+We believe that this information is both relevant and important to the Amherst community because if we can predict headcounts more accurately, we can help prevent further food wastage by giving the Val kitchen staff better information to inform the quantities of food that they cook. Further, if the information is granular enough (i.e. 15 minute periods), we might also be able to offer insight to Amherst students and other members of the Amherst community of predicted peak hours.
+
+# Outline of Analysis
+PLOTS
+- histogram of counts
+
+```{r}
+subset(swipe_data, count!=0) %>% ggplot(aes(count)) + geom_bar(width=20)
+```
+
+
+- counts vs events
+
+```{r}
+
+table(swipe_data$Events)
+```
+
+
+- counts vs t75
+
+ANALYSIS
+- MLR of counts ~ t75+events
+
+count
+
+
+#Uniqueness of tags
+Surprisingly, the tags are all unique, given that there are 109 clusters in t75. We find that R has already factorized the tags into 109 levels, so they are each unique.
+```{r}
+str(swipe_data)
+```
+
+
+
