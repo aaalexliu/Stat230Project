@@ -48,3 +48,13 @@ ANALYSIS
 - MLR of counts ~ t75+events
 
 count
+
+
+#Uniqueness of tags
+Surprisingly, the tags are all unique, given that there are 109 clusters in t75. We find that R has already factorized the tags into 109 levels, so they are each unique.
+```{r}
+str(swipe_data)
+```
+
+
+
