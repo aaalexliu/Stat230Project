@@ -35,9 +35,9 @@ swipe_data2 <- left_join(swipe_data, processed_tags, by = c('date', 'type'))
 #swipes <- swipe_data[,c('date', 'count', 'Events', 'type', 'tag_cluster_t75')]
 swipes <- swipe_data2[,c('date', 'count', 'Events', 'semester', 'type', 'tag_cluster_t75', 'tag_cluster_t69', 'tag_cluster_t66')]
 
-school_only <- filter(swipes, semester == 'Fall' || semester == 'Spring')
+school_only <- filter(swipes, semester == 'Fall' | semester == 'Spring')
 
-tagged <- swipes
+tagged <- school_only
 #only include data with tags
 tagged <- subset(tagged, tag_cluster_t75 != '')
 tagged$tag_cluster_t75 <- factor(tagged$tag_cluster_t75)
