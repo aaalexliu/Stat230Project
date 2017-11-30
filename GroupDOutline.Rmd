@@ -10,51 +10,91 @@ knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(cache = TRUE)
 ```
 
-
-```{r}
+```{r warning=F, include=F}
 library(tidyverse)
 library(ggplot2)
-```
-
-```{r}
+library(lubridate)
 swipe_data<-read.csv('./GroupDDataset.csv')
 ```
 
 # Introduction
-We plan to study historical headcounts for meals eaten at the Valentine Dining Hall (‘Val’) at Amherst College and to build a predictive model by fitting a model to the historical data. We hope that, if our model is accurate enough, it could be used to predict future headcount numbers. 
+
+We plan to study historical headcounts for meals eaten at the Valentine Dining Hall (‘Val’) at Amherst College and to build a predictive model by fitting a model to this historical data (5 years' worth). We hope that, if our model is accurate enough, it could be used to predict future headcount numbers. 
 
 We believe that this information is both relevant and important to the Amherst community because if we can predict headcounts more accurately, we can help prevent further food wastage by giving the Val kitchen staff better information to inform the quantities of food that they cook. Further, if the information is granular enough (i.e. 15 minute periods), we might also be able to offer insight to Amherst students and other members of the Amherst community of predicted peak hours.
 
 # Outline of Analysis
-PLOTS
-- histogram of counts
 
+## PLOTS
+
+### histogram of counts
 ```{r}
-subset(swipe_data, count!=0) %>% ggplot(aes(count)) + geom_bar(width=20)
+subset(swipe_data, count!=0) %>% 
+  ggplot(aes(count)) + 
+  geom_bar(width=20)
 ```
 
-
-- counts vs events
-
+### table of events
 ```{r}
-
 table(swipe_data$Events)
 ```
 
-
-- counts vs t75
-
-ANALYSIS
-- MLR of counts ~ t75+events
-
-count
-
-
-#Uniqueness of tags
-Surprisingly, the tags are all unique, given that there are 109 clusters in t75. We find that R has already factorized the tags into 109 levels, so they are each unique.
+### counts vs events
 ```{r}
-str(swipe_data)
+subset(swipe_data, count!=0) %>%
+  ggplot(aes(Events, count)) + 
+    geom_point() + 
+    geom_jitter() + 
+    theme(axis.text.x = element_text(angle=90, vjust=0.5,hjust=1)) +
+    ggtitle("Headcounts at Val on Events")
 ```
 
+We notice a clear interaction between events and headcounts
+
+### meal types, derived from fuzzy word matching at the 75% threshold
+```{r}
+str(swipe_data$tag_cluster_t75) #109 of them
+```
+
+### headcounts vs meal types
+```{r, warning=F}
+swipe_data %>% ggplot(aes(as.factor(cluster_t75), count)) + 
+  geom_point() + 
+  geom_jitter() +
+  ggtitle('Headcounts at Val on Meal types')
+```
+
+We notice a clear interaction between meal types and headcounts
+
+### headcounts (lunch only) over time with events
+```{r, warning=F}
+subset(swipe_data, type=='Lunch') %>% 
+  ggplot(aes(as.Date(date, format='%m/%d/%Y'), count, color=Events)) +
+    geom_point() +
+    ggtitle("Lunch counts over time with Events colored") +
+    xlab('Date')
+```
+
+We notice a clear interaction between events and headcounts
+
+### non-event headcounts over time
+```{r}
+subset(swipe_data, Events=='') %>% 
+  subset(year(as.Date(date, format='%m/%d/%Y'))==2015) %>% 
+    ggplot(aes(as.Date(date, format='%m/%d/%Y'), count, color=Events)) +
+      geom_point() +
+      geom_smooth(se=F) +
+      ggtitle("Lunch counts over time with Events colored") +
+      xlab('Date')
+```
+
+We notice a slow but observable decline in headcount as each semester progresses 
 
 
+## ANALYSIS
+
+Our brainstormed MLR will look something like counts ~ cluster_t75 + events + weeks_into_year (a variable to be created)
+
+This model is informed by the plots of the variables under consideration shown above, which show that there are clear groups based on the event happening on the day, i.e. that events influence meal counts. Further, we see variability in counts caused by `cluster_t75` as well as the time into the year. These results suggest that these factors will be a significant in an MLR model predicting counts. Additional refinement may include whether the day is a weekend or weekday as a factor.
+
+We want to use MLR as we believe it will provide an easy to understand model. By predicting counts for full meals, we should be able to diminish autocorrelation in intra-meal counts, but this could also possibly ignore the impact of interday autocorrelation in meal counts. We believe this effect should not be large, though this will require further analysis.
