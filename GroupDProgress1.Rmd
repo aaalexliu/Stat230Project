@@ -1,5 +1,5 @@
 ---
-title: "GroupDProgress1"
+title: "GroupD Progress Report 1"
 author: "Alex Liu, Rana Barghout, Daniel Njoo"
 date: "November 29, 2017"
 output: 
@@ -74,7 +74,7 @@ cleaned <- cleaned %>%
   mutate(semester_week = (week(date) - week(min(date)) + 1))
 ```
 
-#Visualization
+#Visualization/Exploration
 We use xts to transform the data into a time series to efficiently slice.
 ```{r}
 slicer <- xts(x = cleaned[,-10], order.by = cleaned$posix)
@@ -93,6 +93,11 @@ fall_2016 <- data.frame(coredata(slicer['2016-09-01/2017-01-01']))
 fall_2016$count <- as.numeric(fall_2016$count)
 bwplot(count ~ tag66, data = fall_2016)
 bwplot(count ~ weekday, data = fall_2016)
+```
+
+We note a very minor possible correlation between meal count and weeks into semester.
+```{r}
+xyplot(count ~ semester_week, data = cleaned)
 ```
 
 ##Time Series Plots
