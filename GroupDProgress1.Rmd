@@ -149,3 +149,44 @@ length(which(summary(mod)$coefficients[,4] < 0.05)) #69 significant ones, includ
 A quick look at the insignificant (at a 5% SL) terms in our initial MLR shows us that it's mainly certain meal types (and a few events such as Family Weekend and Homecoming Weekend) that aren't significant. This will have to be addressed in a future model, i.e. by clustering them further based on their effects on Val swipe count.
 
 Additionally, the current model is relatively predictive, $r^2$ of 74.4% with mostly significant predictors (noted by decent convergence between adjusted and non-adjusted). We plan to add additional variables to increase our model's predictive power, including but not limited to the week into a given semester a meal takes places during - something we noted in our Outline is correlated to Val swipe count.
+
+```{r}
+mod2<-cleaned %>% lm(count~weekday*type*event, data=.)
+summary(mod2)
+# length(which(summary(mod2)$coefficients[,4] > 0.05)) #24 insignificant coefficients
+# length(which(summary(mod2)$coefficients[,4] < 0.05)) 
+```
+
+```{r}
+mod3 <- cleaned %>% lm(count ~ weekday*type, data = .)
+summary(mod3)
+```
+
+```{r}
+mod4 <- cleaned %>% lm(count ~ weekday*type*event + semester_week, data = .)
+summary(mod4)
+```
+
+```{r}
+mod5 <- cleaned %>% lm(count ~ weekday*type*event*semester_week + tag66, data = .)
+summary(mod5)
+```
+
+```{r}
+coefficient_summary <- function(mod){
+  df <- data.frame(summary(mod)$coefficients)
+  df <- tibble::rownames_to_column(df)
+  colnames(df) <- c('term', 'estimate', 'stderror', 'tvalue', 'p')
+  df <- mutate(df, sig10 = between(p, 0, 0.1))
+  df <- mutate(df, sig5 = between(p,0,0.05))
+  return(df)
+}
+mod4summary <- coefficient_summary(mod4)
+
+```
+
+```{r}
+breakfast <- filter(cleaned, type == 'Breakfast')
+```
+
+
