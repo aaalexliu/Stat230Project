@@ -10,16 +10,15 @@ output:
     toc_float: true
 ---
 
-#INTRO
 For Professor Liao: Most of the beginning is data wrangling, mutation, and exploratory analysis. If you want to see initial results from our model, please jump to model.
 
-##SETUP/WRANGLING
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(cache = TRUE)
 ```
 
-### Libraries
+# Setup
+
 ```{r libraries, message=F, warning=F}
 library(tidyverse)
 library(ggplot2)
@@ -75,6 +74,9 @@ cleaned <- cleaned %>%
 ```
 
 #Visualization/Exploration
+
+### Boxplots
+
 We use xts to transform the data into a time series to efficiently slice.
 ```{r}
 slicer <- xts(x = cleaned[,-10], order.by = cleaned$posix)
