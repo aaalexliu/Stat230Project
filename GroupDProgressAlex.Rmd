@@ -1,0 +1,299 @@
+---
+title: "GroupD Progress Report 1"
+author: "Alex Liu, Rana Barghout, Daniel Njoo"
+date: "November 29, 2017"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    theme: united
+    toc_float: true
+---
+
+For Professor Liao: Most of the beginning is data wrangling, mutation, and exploratory analysis. If you want to see initial results from our model, please jump to model.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(cache = TRUE)
+```
+
+# Setup
+
+```{r libraries, message=F, warning=F}
+library(tidyverse)
+library(ggplot2)
+library(xts)
+library(mosaic)
+library(lubridate)
+```
+
+### Data loading
+We include the original dataset, and also a meal clusters by different parameters, to test which threshold of clustering produces the best results from the meal predictor. 
+```{r load data, warning=F}
+swipe_data<-read.csv('./GroupDDataset2.csv')
+swipe_data$date <- as.Date(swipe_data[,'date'], format = '%m/%d/%y')
+processed_tags <- read.csv('./valscraper/val_t60_simplified.csv')
+processed_tags$date <- as.Date(processed_tags[,'date'], format = '%m/%d/%y')
+swipe_data2 <- left_join(swipe_data, processed_tags, by = c('date', 'type'))
+```
+
+### Cleaning Data
+Since our project goal is to look at Val during normal school year operations, we exclude all break data. We also do not have swipe data for the school year 2017-2018, and na.omit removes these as well. 
+```{r cleaning, warning=F}
+swipes <- swipe_data2[,c('date', 'count', 'Events', 'semester', 'type', 'tag_cluster_t75', 'tag_cluster_t69', 'tag_cluster_t66')]
+
+school_only <- filter(swipes, semester == 'Fall' | semester == 'Spring')
+school_only <- na.omit(school_only)
+```
+
+Rows without tags are usually during vacation, and there is no data on the meal served that day. We decide to exclude these from the dataset as it could throw off the meal predictor
+```{r}
+tagged <- subset(school_only, tag_cluster_t75 != '')
+tagged$tag_cluster_t75 <- factor(tagged$tag_cluster_t75)
+not_tagged <- subset(school_only, tag_cluster_t75 != '')
+summary(not_tagged)
+```
+
+### Further wrangling and date processing
+Through the date processing, we add in the factor of weekday, and also weeks into semester, as the financial anaylst at Val noted that student numbers steadily decrease throughout the semester.
+
+```{r wrangle2}
+levels(tagged$Events)[levels(tagged$Events) == ""] <- "No Event"
+colnames(tagged) <- c('date', 'count', 'event', 'semester', 'type', 'tag75', 'tag69', 'tag66')
+cleaned <- tagged
+cleaned$substitute_time[cleaned$type == "Breakfast"] = "8:00:00"
+cleaned$substitute_time[cleaned$type == "Lunch"] = "13:00:00"
+cleaned$substitute_time[cleaned$type == "Dinner"] = "18:00:00"
+cleaned$datetime <- paste(cleaned$date, cleaned$substitute_time)
+cleaned$posix <- as.POSIXct(cleaned$datetime, format = '%Y-%m-%d %H:%M:%S')
+cleaned$weekday <- weekdays(cleaned$posix)
+cleaned <- mutate(cleaned, year = year(date))
+cleaned <- cleaned %>% 
+  group_by(semester, year) %>%
+  mutate(semester_week = (week(date) - week(min(date)) + 1))
+```
+
+#Visualization/Exploration
+
+### Boxplots
+
+We use xts to transform the data into a time series to efficiently slice.
+```{r}
+slicer <- xts(x = cleaned[,-10], order.by = cleaned$posix)
+ts <- xts(x = cleaned[,2], order.by = cleaned$posix)
+```
+
+From the bwplots, we can see that meal categories show large variations from each other in terms of count. We also see that weekdays have different student counts. 
+```{r bwplots full data}
+bwplot(count ~ tag66, data = cleaned)
+bwplot(count ~ weekday, data = cleaned)
+```
+
+Repeat the analysis for a sliced period of time using xts, this one September 1st 2016 to January 1st 2017.
+```{r}
+fall_2016 <- data.frame(coredata(slicer['2016-09-01/2017-01-01']))
+fall_2016$count <- as.numeric(fall_2016$count)
+bwplot(count ~ tag66, data = fall_2016)
+bwplot(count ~ weekday, data = fall_2016)
+```
+
+We note a very minor possible correlation between meal count and weeks into semester.
+```{r}
+xyplot(count ~ semester_week, data = cleaned)
+```
+
+##Time Series Plots
+
+###Time series plots of particular slices. 
+```{r}
+plot(ts[,1])
+plot(ts[,1], subset = '2016-09-01/')
+plot(ts[,1], subset = '2016-09-01/2017-01-01')
+plot(ts[,1], subset = '2016-09')
+```
+
+###Time Series Visualization by Meal Type
+```{r}
+breakfast <- filter(cleaned, type == 'Breakfast')
+lunch <- filter(cleaned, type == 'Lunch')
+dinner <- filter(cleaned, type == 'Dinner')
+joined <- left_join(breakfast,lunch, by = "date")
+joined <- left_join(joined, dinner, by = "date")
+bld <- joined[,c('date', 'count.x', 'count.y', 'count')]
+colnames(bld) <- c('date', 'breakfast', 'lunch', 'dinner')
+ts2 <- xts(bld[,2:4], order.by = bld$date)
+```
+
+As we can see from the graphs below, there are significant differences between meal types that persist throughout the data, at different degrees of granularity.
+```{r}
+plot(ts2, legend.loc = 'topleft')
+plot(ts2, subset = '2016-09-01/', legend.loc = 'topleft')
+plot(ts2, subset = '2016-09-01/2017-01-01', legend.loc = 'topleft')
+plot(ts2, subset = '2016-09', legend.loc = 'topleft')
+```
+
+#Model
+
+## Initial Model
+```{r mod}
+mod<-cleaned %>% lm(count~weekday+tag75+type+event, data=.)
+summary(mod)$r.squared
+summary(mod)$adj.r.squared
+```
+
+## Improvements
+```{r}
+which(summary(mod)$coefficients[,4] > 0.05)
+length(which(summary(mod)$coefficients[,4] > 0.05)) #24 insignificant coefficients
+length(which(summary(mod)$coefficients[,4] < 0.05)) #69 significant ones, including all non-meal types
+```
+
+A quick look at the insignificant (at a 5% SL) terms in our initial MLR shows us that it's mainly certain meal types (and a few events such as Family Weekend and Homecoming Weekend) that aren't significant. This will have to be addressed in a future model, i.e. by clustering them further based on their effects on Val swipe count.
+
+Additionally, the current model is relatively predictive, $r^2$ of 74.4% with mostly significant predictors (noted by decent convergence between adjusted and non-adjusted). We plan to add additional variables to increase our model's predictive power, including but not limited to the week into a given semester a meal takes places during - something we noted in our Outline is correlated to Val swipe count.
+
+```{r}
+  mod2<-cleaned %>% lm(count~weekday*type*event, data=.)
+summary(mod2)
+# length(which(summary(mod2)$coefficients[,4] > 0.05)) #24 insignificant coefficients
+# length(which(summary(mod2)$coefficients[,4] < 0.05)) 
+```
+
+```{r}
+mod3 <- cleaned %>% lm(count ~ weekday*type, data = .)
+summary(mod3)
+```
+
+```{r}
+mod4 <- cleaned %>% lm(count ~ weekday*type*event + semester_week, data = .)
+summary(mod4)
+```
+
+```{r}
+mod5 <- cleaned %>% lm(count ~ weekday*type*event*semester_week + tag66, data = .)
+summary(mod5)
+```
+
+```{r}
+coefficient_summary <- function(mod){
+  df <- data.frame(summary(mod)$coefficients)
+  df <- tibble::rownames_to_column(df)
+  colnames(df) <- c('term', 'estimate', 'stderror', 'tvalue', 'p')
+  df <- mutate(df, sig10 = between(p, 0, 0.1))
+  df <- mutate(df, sig5 = between(p,0,0.05))
+  return(df)
+}
+mod4summary <- coefficient_summary(mod4)
+
+```
+
+```{r}
+tally(cleaned$event)
+exclude <- c('Reading Study Period', 'Final Exam Period', 'Thanksgiving Vacation',
+            'Spring Break', 'Mid Semester Break')
+nobreaks <- filter(cleaned, !(event %in% exclude))
+nobreaks$event <- factor(nobreaks$event)
+tally(nobreaks$event)
+```
+
+
+```{r}
+breakfast <- filter(nobreaks, type == 'Breakfast')
+breakfast_model <- lm(count ~ event*semester_week*weekday, data = breakfast)
+summary(breakfast_model)
+```
+
+```{r}
+dinner_nobreaks <- filter(nobreaks, type == 'Dinner')
+dinner_nobreaks$tag66 <- factor(dinner_nobreaks$tag66)
+dinner_model1 <- lm(count ~ semester_week*weekday*tag66*event, data = dinner)
+summary(dinner_model1)
+
+dinner_model2 <- lm(count ~ event*semester_week*weekday, data = dinner)
+summary(dinner_model2)
+
+dinner_model3 <- lm(count ~ event*semester_week*weekday + tag69, data = dinner)
+summary(dinner_model3)
+
+dinner_model4 <- lm(count ~ event*semester_week*weekday + tag69, data = dinner)
+summary(dinner_model3)
+```
+
+
+```{r}
+library(glmulti)
+general <- glm(count ~ event + semester_week + semester + weekday + tag66, data = dinner)
+processed <- glmulti(general, level = 2, crit = "aic")
+
+general_nobreaks <- glm(count ~ event + semester_week + semester + weekday + tag66, data = dinner_nobreaks)
+processed_nobreaks <- glmulti(general_nobreaks, level = 2, crit = "aic")
+```
+
+```{r}
+summary(processed)
+topmodels <- data.frame(weightable(processed))
+head(topmodels)
+```
+
+```{r}
+summary(processed_nobreaks)
+head(data.frame(weightable(processed)))
+plot(processed_nobreaks, type = "s")
+
+top_terms_model <- lm(count ~ tag66*weekday + event + semester*tag66 +
+                        semester_week + semester*weekday, data = dinner_nobreaks)
+summary(top_terms_model)
+top_terms_model_coefficients <- coefficient_summary(top_terms_model)
+
+library(car)
+alias(top_terms_model)
+
+toptermsmodel2 <- lm(count ~ event + semester*tag66 +
+                        semester_week + semester*weekday, data = dinner_nobreaks)
+summary(toptermsmodel2)
+top_terms_model_coefficients2 <- coefficient_summary(toptermsmodel2)
+
+toptermsmodel3 <- lm(count ~ event*semester_week + semester*weekday + tag66, data = dinner)
+
+summary(toptermsmodel3)
+
+try4 <- lm(count ~ event + semester*weekday + semester_week, data = dinner_nobreaks)
+summary(try4)
+```
+
+```{r}
+pred <- predict(toptermsmodel3, data = dinner_nobreaks[,-2])
+head(as.data.frame(pred))
+dinner_nobreaks$pred <- predict(toptermsmodel3, data = dinner_nobreaks[,-2])
+ts3 <- xts(dinner_nobreaks[,c('count', 'pred')], order.by = dinner_nobreaks$date)
+# plot(ts3, subset = '2016-09-01/', legend.loc = 'topleft')
+plot(ts3, legend.loc = 'topleft')
+plot(ts3, subset = '2016-09-01/2017-01-01', legend.loc = 'topleft')
+```
+
+
+```{r}
+topmodel1 <- lm(count ~ event*semester_week + event*weekday + tag66 + semester*weekday, data = dinner)
+summary(topmodel1)
+
+topmodel3 <- lm(count ~ tag66 + semester_week*event + weekday, data = dinner)
+summary(topmodel3)
+
+topmodel4 <- lm(count ~ tag66*weekday + semester_week*event, data = dinner)
+summary(topmodel4)
+coef4 <- coefficient_summary(topmodel4)
+```
+
+```{r}
+general_cleaned <- glm(count ~ event + semester_week + weekday + tag66 + type, data = cleaned)
+# processed_cleaned <- glmulti(general_cleaned, level = 2, crit = "aic")
+processed_cleaned <- load('/Users/Alex/Dropbox (Amherst College)/Amherst/Intermediate Statistics 230/val_project/glmulti_full_cleaned.RData')
+```
+
+```{r}
+dinner_full <- filter(cleaned, type = "Dinner")
+dinner$tag66 <- factor(dinner$tag66)
+general_dinner_full <-  glm(count ~ event + semester_week + weekday + tag66, data = dinner_full)
+processed_dinner_full <- glmulti(general_dinner_full, level = 2, crit = "aic")
+```
+
