@@ -1,0 +1,114 @@
+---
+title: "GroupDReport"
+author: "Rana Barghout, Alex Liu, Daniel Njoo"
+date: "12/15/2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(cache = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(mosaic)
+library(lubridate)
+```
+
+#Introduction
+
+We decided to investigate wh
+
+
+No more than 1 page. Briefly describe the dataset you are studying and the research question(s) you aim to answer. Provide ample motivations to convince your audience of the relevance of your research question(s), i.e. why the question(s) you proposed is important, meaningful, or interesting.
+
+#Data
+
+```{r echo=F, warning=F}
+swipe_data<-read.csv('./GroupDDataset2.csv')
+swipe_data$date <- as.Date(swipe_data[,'date'], format = '%m/%d/%y')
+processed_tags <- read.csv('./val_t60_simplified.csv')
+processed_tags$date <- as.Date(processed_tags[,'date'], format = '%m/%d/%y')
+
+swipe_data2 <- left_join(swipe_data, processed_tags, by = c('date', 'type'))
+
+swipes <- swipe_data2[,c('date', 'count', 'Events', 'semester', 'type', 'tag_cluster_t75', 'tag_cluster_t69', 'tag_cluster_t66')]
+
+school_only <- filter(swipes, semester == 'Fall' | semester == 'Spring')
+school_only <- na.omit(school_only)
+tagged <- subset(school_only, tag_cluster_t75 != '')
+levels(tagged$Events)[levels(tagged$Events) == ""] <- "No Event"
+colnames(tagged) <- c('date', 'count', 'event', 'semester', 'type', 'tag75', 'tag69', 'tag66')
+
+cleaned <- tagged
+cleaned$substitute_time[cleaned$type == "Breakfast"] = "8:00:00"
+cleaned$substitute_time[cleaned$type == "Lunch"] = "13:00:00"
+cleaned$substitute_time[cleaned$type == "Dinner"] = "18:00:00"
+cleaned$datetime <- paste(cleaned$date, cleaned$substitute_time)
+cleaned$posix <- as.POSIXct(cleaned$datetime, format = '%Y-%m-%d %H:%M:%S')
+cleaned$weekday <- weekdays(cleaned$posix)
+cleaned <- mutate(cleaned, year = year(date))
+cleaned <- cleaned %>% 
+  group_by(semester, year) %>%
+  mutate(semester_week = (week(date) - week(min(date)) + 1))
+```
+
+```{r}
+cleaned %>% dim()
+```
+
+Our cleaned and wrangled dataset contains 1923 rows and 14 columns. Each observational unit corresponds to a single meal at the Valentine Dining Hall in the 3 academic years starting 2014, 2015, and 2016. 
+
+```{r}
+cleaned %>% names()
+```
+
+Our response variable was `count`, which is the number of swipes in any given meal period. 
+
+Our explanatory variables were:
+
+- `event`, which refers to whether there was a specific event on the day such as Finals, or Family weekend.
+- `semester`, either Fall or Spring
+- `type`, either Breakfast, Lunch or dinner
+- `tag75`, `tag69`, `tag66`, what menu was being offered for the meal, the number represents the string matching threshold used to cluster these labels
+- `weekday`, Monday through Sunday
+- `semester_week`, refers to how many weeks into a given semester a meal was, ranges from 1-17
+
+Other variables `substitute_time`, `datetime`, and `posix` were variables we used in wrangling and did not feature in our model.
+
+Plot1- semester week
+
+```{r echo=F, warning=F, message=F}
+cleaned %>% ggplot(aes(semester_week, count)) + geom_point() + geom_smooth(se=F) +facet_wrap(~semester)
+```
+
+Plot2- interaction between semester and weekday
+
+```{r echo=F, warning=F}
+with(cleaned, interaction.plot(weekday, semester, count, las=3))
+```
+
+Plot3- variation in swipes between events
+
+```{r, echo=F, warning=F}
+cleaned %>%
+  filter(event!="Summer Break") %>% 
+  ggplot(aes(event, count)) + 
+  facet_wrap(~type) +
+    geom_boxplot() + 
+    theme(axis.text.x = element_text(angle=90, vjust=0.5,hjust=1)) +
+    ggtitle("Headcounts at Val on Events")
+```
+
+Describe your dataset in detail. What does one unit/observation of the dataset correspond to and what variables are available? You should provide a good understanding of the response variable(s) and the key explanatory variables. Show and describe 3-5 plots that give the best portrayal of the data or help to motivate the ensuing analysis. (You may include additional plots in Appendix.)
+
+#Analysis
+
+Present the analysis corresponding to your research question(s). For any statistical tech- niques that you used, check to see if the assumptions/conditions are appropriate and fully explain the results in the context of your research question(s). If you used methods that were not taught in our class (which is allowed!), please include a brief tutorial.
+
+#Conclusions
+
+Summarize your findings. Do you have any concerns about the data? Could your analysis have benefited from other data sources? What, if anything, would you do differently if you could collect your own data or design your own experiment to address the same research question?
+
+#Appendix
+
+While you may include some short bits of R code (less than 5 lines) in the main body of the report, it’s often better to put your longer R code chunks here. Similarly, you might want to include only the most important plots and R output in the main body of the report, and leave all other relevant ones here; you can always refer to those in the Appendix using some sentence like “Please see Plot/Output XX in the Appendix”. How to organize R output and plots to support your statements in the report is certainly one key learning point of this project.
