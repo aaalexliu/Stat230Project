@@ -40,6 +40,8 @@ levels(tagged$Events)[levels(tagged$Events) == ""] <- "No Event"
 colnames(tagged) <- c('date', 'count', 'event', 'semester', 'type', 'tag75', 'tag69', 'tag66')
 
 cleaned <- tagged
+cleaned <- cleaned %>% filter(event!="Summer Break")
+cleaned$event <- factor(cleaned$event)
 cleaned$substitute_time[cleaned$type == "Breakfast"] = "8:00:00"
 cleaned$substitute_time[cleaned$type == "Lunch"] = "13:00:00"
 cleaned$substitute_time[cleaned$type == "Dinner"] = "18:00:00"
@@ -52,17 +54,37 @@ cleaned <- cleaned %>%
   mutate(semester_week = (week(date) - week(min(date)) + 1))
 ```
 
-```{r}
-cleaned %>% dim()
-```
+## Dimensions
 
 Our cleaned and wrangled dataset contains 1923 rows and 14 columns. Each observational unit corresponds to a single meal at the Valentine Dining Hall in the 3 academic years starting 2014, 2015, and 2016. 
+
+```{r}
+cleaned %>% dim()
+cleaned$year %>% table()
+```
+
+## Variables
+
+Our 14 available variables were:
 
 ```{r}
 cleaned %>% names()
 ```
 
-Our response variable was `count`, which is the number of swipes in any given meal period. 
+## Response Variable
+
+Our response variable was `count`, which is the number of swipes in any given meal period. A summary description of the stats, and a histogram of count is shown below. We see that the distribution is unimodal with a mean of 875 (roughly half the student body), and a standard deviation of 306, which is surprisingly high: a 1 standard deviation range runs from 569 to 1181 which covers 68% of all meals (68-95-99.7 rule). The mean is very close to the median which implies a lack of skew.
+
+```{r warning=F, fig.height=4, fig.width=6}
+favstats(cleaned$count)
+cleaned %>% 
+  ggplot(aes(count)) + 
+  geom_density() + 
+  xlab("Number of swipes at Val") + 
+  ggtitle("Density plot of `count`")
+```
+
+## Explanatory Variable
 
 Our explanatory variables were:
 
@@ -75,31 +97,55 @@ Our explanatory variables were:
 
 Other variables `substitute_time`, `datetime`, and `posix` were variables we used in wrangling and did not feature in our model.
 
-Plot1- semester week
+## tag66, what was on the menu
 
-```{r echo=F, warning=F, message=F}
-cleaned %>% ggplot(aes(semester_week, count)) + geom_point() + geom_smooth(se=F) +facet_wrap(~semester)
+`tag66` represents what was on the menu that day, scraped from the school's [website](https://www.amherst.edu/campuslife/housing-dining/dining/menu), the details of this will be explained in the next section. As there are 55 categories, and each is a long string, the labels of these are omitted in the following plot which is displayed to show the variance in count between menu types. In light of this variance, we used `tag66` in our model. 
+
+- It's worth noting that the count of each these varied significantly, and the most common meal type was 'free cage' because this represented every breakfast and a few brunches (790 vs 612), and that fortunately burger was the second most common mean type because as we later found out, this meal had quite a strong positive effect on `count`.
+
+```{r echo=F, warning=F, message=F, fig.height=4, fig.width=6}
+cleaned$tag66 %>% table %>% as.data.frame -> temp; temp$. %>% substr(0,10) -> temp$.; temp %>% arrange(desc(Freq)) %>% head(2)
+cleaned$type %>% table
+cleaned %>% 
+  ggplot(aes(as.factor(tag66), count)) + 
+  geom_boxplot() + 
+  ggtitle('Headcounts at Val on menu types') +
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  xlab('Menu Type')
 ```
 
-Plot2- interaction between semester and weekday
+## Semester*Weekday, the interaction between them
 
-```{r echo=F, warning=F}
-with(cleaned, interaction.plot(weekday, semester, count, las=3))
+During our analysis we found a relatively significant interaction between `semester` and `weekday`, this is indicated by the relative absence of parallel slopes in this interaction plot where we notice Spring turnout to be consistently lower than Fall (perhaps due to study abroad?):
+
+```{r echo=F, warning=F, fig.height=4, fig.width=6}
+cleaned$weekday<-factor(cleaned$weekday, levels=c("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"))
+cleaned$weekday <- cleaned$weekday %>% strtrim(2)
+with(cleaned, interaction.plot(weekday, semester, count, las=2))
 ```
 
-Plot3- variation in swipes between events
+## events, what was going on at Amherst
 
-```{r, echo=F, warning=F}
+The next plot shows the variation in `count` when explored through `event`, what was going on on campus that day. `Event` encodes things such as Family Weekend or Thanksgiving Break. We noticed significant variation as evidenced by the vastly different medians and IQRs in boxplots.
+
+```{r, echo=F, warning=F, fig.height=4, fig.width=6}
 cleaned %>%
   filter(event!="Summer Break") %>% 
   ggplot(aes(event, count)) + 
-  facet_wrap(~type) +
     geom_boxplot() + 
     theme(axis.text.x = element_text(angle=90, vjust=0.5,hjust=1)) +
     ggtitle("Headcounts at Val on Events")
 ```
 
-Describe your dataset in detail. What does one unit/observation of the dataset correspond to and what variables are available? You should provide a good understanding of the response variable(s) and the key explanatory variables. Show and describe 3-5 plots that give the best portrayal of the data or help to motivate the ensuing analysis. (You may include additional plots in Appendix.)
+## semester_week, the week into the semester
+
+`semester_week` also turned out to be a useful predictor, and this is evidenced by the variation in `count` that it is correlated with. Here we faceted it with `semester` because we found it intuitive that secondary modes occurred in difference places due to Spring Break (`semester_week`~=7) and Thanksgiving Break (`semester_week`~=12), but we did not end up pursuing a three-way interaction between `semester_week`, `semester`, and `weekday`, because this would have exponentiated the number of coefficients in our final and model and would have made interpretation more difficult.
+
+```{r echo=F, warning=F, message=F, fig.width=6, fig.height=4}
+cleaned %>% ggplot(aes(semester_week, count)) + geom_point() + geom_smooth(se=F) +facet_wrap(~semester)
+```
+
 
 #Analysis
 
